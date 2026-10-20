@@ -132,7 +132,7 @@ export class NeonScene {
   private buildText() {
     const max = this.reduced ? 48 : config.performance.maxNeonPhrases;
     const phrases = config.neonPhrases.length ? config.neonPhrases : ["20/10"];
-    const buckets = [0.13, 0.19, 0.3, 0.5];
+    const buckets = [0.16, 0.23, 0.36, 0.6];
     // Mỗi câu chỉ cần một texture; trước đây texture được tạo lại cho từng
     // "bucket" dù nội dung giống hệt, làm tăng gấp nhiều lần thời gian dựng.
     const textures = new Map<string, THREE.Texture>();
@@ -223,7 +223,7 @@ export class NeonScene {
       });
       const aspect = tex.userData.aspect as number;
       const hero = i === 0;
-      const baseH = hero ? 2.15 : 0.9 + Math.random() * 1.2;
+      const baseH = hero ? 2.38 : 0.99 + Math.random() * 1.32;
       const geo = new THREE.PlaneGeometry(baseH * aspect, baseH);
       const mesh = new THREE.Mesh(geo, mat);
 
@@ -285,7 +285,7 @@ export class NeonScene {
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geo.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
     const mat = new THREE.PointsMaterial({
-      size: 0.38,
+      size: 1.35,
       map: getHeartTexture(),
       transparent: true,
       depthWrite: false,
