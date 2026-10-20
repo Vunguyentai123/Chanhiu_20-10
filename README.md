@@ -150,14 +150,13 @@ Thay `public/audio/music.mp3` bằng bản nhạc bạn có quyền sử dụng.
 
 Dự án đã đặt `base: "./"` và chuẩn hoá đường dẫn asset trong `src/core/assets.ts`, nên chạy đúng cả ở thư mục con dạng `https://<user>.github.io/<repo>/`.
 
-Cách nhanh:
+Workflow có sẵn tại `.github/workflows/deploy.yml`:
 
-```bash
-npm run build
-# đưa nội dung dist/ lên nhánh gh-pages
-```
+1. Push code lên nhánh `main`.
+2. Vào **Settings → Pages → Build and deployment → Source**, chọn **GitHub Actions** (không chọn "Deploy from a branch").
+3. Mỗi lần push, GitHub Actions sẽ chạy `npm ci`, `npm run build` và deploy thư mục `dist/`.
 
-Hoặc dùng GitHub Actions với `actions/upload-pages-artifact` trỏ vào `dist`.
+Nếu dùng tên miền riêng, thêm file `public/CNAME` chứa đúng tên miền (ví dụ `thiep20-10.com`) để Vite copy vào `dist/` khi build, rồi khai báo domain trong **Settings → Pages → Custom domain**.
 
 > Không cần server rewrite vì site chỉ có một trang.
 
