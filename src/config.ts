@@ -53,18 +53,8 @@ export const config = {
     "Mong nụ cười em luôn ở lại",
     "Chúc em luôn tự tin và tỏa sáng",
     "Anh thương em nhiều lắm",
-    "Cảm ơn em đã xuất hiện",
     "Mỗi ngày có em là một ngày vui",
     "Chúc em một đời bình an",
-    "Chúc em thật nhiều sức khỏe",
-    "Mong em luôn mạnh mẽ",
-    "Mong em luôn rạng rỡ",
-    "Chúc em gặp nhiều điều tốt lành",
-    "Em là điều may mắn của anh",
-    "Chúc em ngày nào cũng vui",
-    "Chúc em luôn vui tươi",
-    "Mong em luôn hạnh phúc",
-    "Chúc em có một ngày thật đẹp",
   ],
 
   /**
@@ -73,9 +63,9 @@ export const config = {
    * Gợi ý: dùng câu của riêng bạn, đừng dùng lời bài hát có bản quyền.
    */
   captions: [
-    { at: 0, text: "Anh luôn ở đây, bên em" },
+    { at: 0, text: "Anh luôn ở đây bên em" },
     { at: 6, text: "Mỗi ngày bên em đều là món quà" },
-    { at: 12, text: "Nhẹ nhàng thôi, anh thương em" },
+    { at: 12, text: "Anh thương em" },
     { at: 18, text: "Một chút yêu thương, gửi riêng em" },
   ],
 
@@ -83,7 +73,7 @@ export const config = {
   hints: {
     bouquet1: "Chạm vào bó hoa",
     bouquet2: "Ấn giữ bó hoa",
-    neon: "Kéo để xoay 360°",
+    neon: "Kéo để xoay 360°, bấm vô ảnh để xem ảnh",
     envelope: "Chạm phong bì để mở thư",
   },
 
@@ -99,10 +89,10 @@ export const config = {
 
   /** Nội dung lá thư. */
   letter: {
-    title: "Gửi cô gái bé nhỏ của anh ♡",
+    title: "Gửi Chanh iu của anh ♡",
     body: [
       "Anh chúc em ngày 20/10 lúc nào cũng xinh đẹp, may mắn, nhiều sức khỏe và lúc nào cũng vui vẻ. Anh mong rằng em sẽ đồng hành cùng anh trên chặng đường phía trước.",
-      "Anh yêu em bé của anh.",
+      "Anh yêu em",
     ],
   },
 
@@ -115,7 +105,7 @@ export const config = {
   /** Cài đặt hiệu năng / mỹ thuật (thường không cần sửa). */
   performance: {
     maxPixelRatio: 2,
-    maxNeonPhrases: 52, // 26 câu, mỗi câu xuất hiện 2 lần
+    maxNeonPhrases: 96,
     maxStars: 520,
     maxHearts: 90,
     maxPhotoCards: 20,
