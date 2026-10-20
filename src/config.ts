@@ -48,6 +48,23 @@ export const config = {
     "yêu em",
     "20/10",
     "Chúc mừng ngày Phụ nữ Việt Nam",
+    "Chúc em một ngày thật dịu dàng",
+    "Mong em luôn được yêu thương",
+    "Mong nụ cười em luôn ở lại",
+    "Chúc em luôn tự tin và tỏa sáng",
+    "Anh thương em nhiều lắm",
+    "Cảm ơn em đã xuất hiện",
+    "Mỗi ngày có em là một ngày vui",
+    "Chúc em một đời bình an",
+    "Chúc em thật nhiều sức khỏe",
+    "Mong em luôn mạnh mẽ",
+    "Mong em luôn rạng rỡ",
+    "Chúc em gặp nhiều điều tốt lành",
+    "Em là điều may mắn của anh",
+    "Chúc em ngày nào cũng vui",
+    "Chúc em luôn vui tươi",
+    "Mong em luôn hạnh phúc",
+    "Chúc em có một ngày thật đẹp",
   ],
 
   /**
@@ -98,10 +115,10 @@ export const config = {
   /** Cài đặt hiệu năng / mỹ thuật (thường không cần sửa). */
   performance: {
     maxPixelRatio: 2,
-    maxNeonPhrases: 96,
+    maxNeonPhrases: 52, // 26 câu, mỗi câu xuất hiện 2 lần
     maxStars: 520,
     maxHearts: 90,
-    maxPhotoCards: 18,
+    maxPhotoCards: 20,
   },
 };
 

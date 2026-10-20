@@ -131,7 +131,56 @@ export class NeonScene {
 
   private buildText() {
     const max = this.reduced ? 48 : config.performance.maxNeonPhrases;
-    const phrases = config.neonPhrases.length ? config.neonPhrases : ["20/10"];
+    const phrases = Array.from(
+      new Set(config.neonPhrases.length ? config.neonPhrases : ["20/10"]),
+    );
+    // Xáo trộn theo từng "túi": chỉ lặp lại một câu sau khi đã dùng hết các câu
+    // khác. Bản sao của mỗi câu cũng được đẩy ra xa bản gốc nhất có thể.
+    const bag: string[] = [];
+    let previous = "";
+    const refill = () => {
+      const shuffled = phrases.slice();
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      if (shuffled.length > 1 && shuffled[0] === previous) {
+        const j = 1 + Math.floor(Math.random() * (shuffled.length - 1));
+        [shuffled[0], shuffled[j]] = [shuffled[j], shuffled[0]];
+      }
+      bag.push(...shuffled);
+    };
+    const placed = new Map<string, THREE.Vector3[]>();
+    const counts = new Map<string, number>();
+    const takePhrase = (position: THREE.Vector3) => {
+      if (!bag.length) refill();
+      const dir = position.clone().normalize();
+      // Ưu tiên câu chưa xuất hiện; sau đó chọn câu có bản sao gần nhất xa nhất
+      // về hướng, để các câu giống nhau không đứng cạnh nhau.
+      let chosen = bag[0];
+      let bestCount = Infinity;
+      let bestDot = Infinity;
+      for (const candidate of bag) {
+        const count = counts.get(candidate) ?? 0;
+        const dirs = placed.get(candidate);
+        let nearestDot = -1;
+        if (dirs) {
+          for (const other of dirs) nearestDot = Math.max(nearestDot, dir.dot(other));
+        }
+        if (count < bestCount || (count === bestCount && nearestDot < bestDot)) {
+          bestCount = count;
+          bestDot = nearestDot;
+          chosen = candidate;
+        }
+      }
+      bag.splice(bag.indexOf(chosen), 1);
+      previous = chosen;
+      counts.set(chosen, (counts.get(chosen) ?? 0) + 1);
+      const dirs = placed.get(chosen);
+      if (dirs) dirs.push(dir);
+      else placed.set(chosen, [dir]);
+      return chosen;
+    };
     const buckets = [0.16, 0.23, 0.36, 0.6];
     // Mỗi câu chỉ cần một texture; trước đây texture được tạo lại cho từng
     // "bucket" dù nội dung giống hệt, làm tăng gấp nhiều lần thời gian dựng.
@@ -147,7 +196,6 @@ export class NeonScene {
     };
 
     for (let i = 0; i < max; i++) {
-      const phrase = phrases[i % phrases.length];
       // 12 cung quanh tâm, mỗi cung một cụm lớn; phần còn lại rải thành các lớp sâu.
       const near = i < 12;
       const sector = (near ? i : i - 12) % 12;
@@ -165,6 +213,8 @@ export class NeonScene {
         radius = 3.5 + Math.random() * 8;
       }
       const yaw = (sector / 12) * TAU + (Math.random() - 0.5) * 0.3;
+      const position = pointOnSphere(radius, yaw, pitch);
+      const phrase = takePhrase(position);
       const tex = getTex(phrase);
       const baseOpacity = near ? 0.8 + Math.random() * 0.14 : 0.46 + Math.random() * 0.24;
       const material = new THREE.SpriteMaterial({
@@ -177,7 +227,7 @@ export class NeonScene {
         toneMapped: false,
       });
       const sprite = new THREE.Sprite(material);
-      sprite.position.copy(pointOnSphere(radius, yaw, pitch));
+      sprite.position.copy(position);
       const aspect = tex.userData.aspect as number;
       const baseH = bucket;
       sprite.scale.set(baseH * aspect, baseH, 1);
@@ -200,11 +250,15 @@ export class NeonScene {
       : config.performance.maxPhotoCards;
     const photos = (config.photos.length ? config.photos : ["/photos/1.webp"]).map(assetUrl);
     const cardTextures = new Map<string, THREE.Texture>();
+    // Hai thẻ cuối dành riêng cho ảnh 6, để ảnh này xuất hiện nhiều hơn.
+    const photo6 = photos[Math.min(5, photos.length - 1)];
+    const extraFrom = count - 2;
     // Rải ảnh theo các cung 30°, giữ độ cao vừa phải để không bị cắt quá nhiều.
     const pitchPattern = [-30, 14, -8, 36, -36, 6, 28, -20, 0, 34, -32, 18, -16, 38, -6, 24];
     const radiusPattern = [8.5, 10.2, 7.2, 9.6, 8, 11, 9, 10.8, 7.8, 9.4, 10.6, 8.2, 11.2, 7, 9.8, 10];
     for (let i = 0; i < count; i++) {
-      const photo = photos[i % photos.length];
+      const photo =
+        !this.reduced && i >= extraFrom ? photo6 : photos[i % photos.length];
       // Nhiều thẻ có thể dùng chung một ảnh: chia sẻ texture để không vẽ lại canvas.
       let tex = cardTextures.get(photo);
       if (!tex) {

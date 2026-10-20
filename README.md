@@ -131,7 +131,7 @@ Thay `public/audio/music.mp3` bằng bản nhạc bạn có quyền sử dụng.
 
 - `devicePixelRatio` bị giới hạn ở 2.
 - Chữ neon dùng sprite + canvas texture (không tạo hàng trăm DOM node), glow vẽ sẵn trong texture thay vì post-processing.
-- Camera orbit quanh một cụm 3D thay vì dựng nội dung khắp 360°: mỗi hướng nhìn vẫn đặc, nhưng chỉ cần ~96 chữ và 18 thẻ.
+- Camera orbit quanh một cụm 3D thay vì dựng nội dung khắp 360°: mỗi hướng nhìn vẫn đặc, nhưng chỉ cần ~52 chữ (26 câu, mỗi câu 2 lần) và 20 thẻ (trong đó có 4 thẻ ảnh 6).
 - Không gian neon được dựng trễ sau khi cảnh bó hoa hiện; ảnh 7–10 không nằm trong preload đầu trang.
 - Số lượng hạt/chữ/thẻ giới hạn trong `config.performance`.
 - `prefers-reduced-motion`: giảm số hạt, bỏ hiệu ứng chuyển cảnh nặng, tắt hiệu ứng thở/lơ lửng của bó hoa, hiện chữ thư ngay.
