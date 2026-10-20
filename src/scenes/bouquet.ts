@@ -23,6 +23,7 @@ type BouquetOptions = {
 
 const HOLD_MS = 950;
 const EXIT_SECONDS = 1.5;
+const BOUQUET_FOV = 48;
 
 type PhotoLayer = {
   mesh: THREE.Mesh;
@@ -236,7 +237,7 @@ export class BouquetScene {
 
   private visibleSize(z: number) {
     const stage = getStage();
-    const vh = 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * z;
+    const vh = 2 * Math.tan(THREE.MathUtils.degToRad(BOUQUET_FOV / 2)) * z;
     return new THREE.Vector2(vh * (stage.width / stage.height), vh);
   }
 
@@ -327,8 +328,8 @@ export class BouquetScene {
     this.started = true;
     this.camTween?.kill();
     // Neon dùng ống kính rộng hơn; trả bó hoa về đúng khung ban đầu.
-    if (this.camera.fov !== 48) {
-      this.camera.fov = 48;
+    if (this.camera.fov !== BOUQUET_FOV) {
+      this.camera.fov = BOUQUET_FOV;
       this.camera.updateProjectionMatrix();
     }
     // Camera neon có thể đang orbit lệch tâm; trả cả vị trí lẫn hướng về mặc định.
