@@ -193,10 +193,8 @@ export class EnvelopeScene {
     this.el.querySelector<HTMLElement>(".env-wrap")!.classList.add("is-open");
     gsap.fromTo(
       this.letter,
-      { xPercent: -50, yPercent: -50, y: 48, opacity: 0, scale: 0.94 },
+      { y: 48, opacity: 0, scale: 0.94 },
       {
-        xPercent: -50,
-        yPercent: -50,
         y: 0,
         opacity: 1,
         scale: 1,

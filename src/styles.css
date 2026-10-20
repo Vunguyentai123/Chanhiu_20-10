@@ -912,12 +912,11 @@ img {
 /* Letter */
 .letter {
   position: absolute;
+  inset: 0;
   z-index: 50;
-  left: 50%;
-  top: 50%;
-  width: 86%;
-  max-width: calc(370px * var(--scale));
-  transform: translate(-50%, -50%) scale(0.76);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -931,7 +930,8 @@ img {
 
 .letter-paper {
   position: relative;
-  width: 100%;
+  width: 86%;
+  max-width: calc(370px * var(--scale));
   min-height: calc(54dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   max-height: calc(78dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
