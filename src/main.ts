@@ -214,18 +214,15 @@ class App {
 
   private bindHud() {
     const unlockAudio = (event: Event) => {
-      // Để nút loa tự xử lý: chạm lần đầu vào nút sẽ bật nhạc,
-      // không bị handler toàn cục bật rồi click lại tắt ngay.
+      // Để nút loa tự xử lý, tránh việc chạm một lần vừa bật vừa tắt nhạc.
       if ((event.target as HTMLElement | null)?.closest(".hud, button")) return;
       if (!audio.hasStarted && !audio.isMuted) void audio.start();
     };
 
     this.ui.soundBtn.addEventListener("click", () => {
-      if (!audio.hasStarted && !audio.isMuted) {
-        void audio.start();
-      } else {
-        audio.toggle();
-      }
+      // Luôn là công tắc tắt/bật: nhạc đang chạy thì dừng ngay,
+      // nhạc đang tắt thì giữ im lặng; chạm lần nữa để bật lại.
+      audio.toggle();
     });
     this.ui.heartBtn.addEventListener("click", () => {
       if (this.sceneName === "neon") void this.goToEnvelope();
