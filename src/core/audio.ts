@@ -7,6 +7,7 @@ class AudioEngine {
   private listeners = new Set<(state: { muted: boolean; started: boolean }) => void>();
   private fadeTween: gsap.core.Tween | null = null;
   private warmed = false;
+  private playAttempt = 0;
 
   init(src: string) {
     if (!src) return;
@@ -41,18 +42,24 @@ class AudioEngine {
 
   async start() {
     if (!this.el || this.started) return;
+    const attempt = ++this.playAttempt;
     this.started = true;
     this.el.volume = 0;
+    // iOS Safari không cho chỉnh volume của thẻ audio, nên trạng thái tắt
+    // tiếng phải dựa vào thuộc tính muted/pause thay vì volume.
+    this.el.muted = this.muted;
     if (!this.warmed) {
       this.warmed = true;
       this.el.preload = "auto";
     }
     try {
       await this.el.play();
+      if (attempt !== this.playAttempt) return;
       this.fadeTo(this.muted ? 0 : 0.55, 1.3);
     } catch (error) {
+      if (attempt !== this.playAttempt) return;
       // Autoplay bị chặn hoặc file chưa sẵn sàng - thử lại ở lần chạm kế tiếp.
-      this.started = false;
+      if (!this.muted && this.el.paused) this.started = false;
       console.warn("[audio] Chưa phát được nhạc nền:", error);
     }
     this.emit();
@@ -64,12 +71,29 @@ class AudioEngine {
     this.fadeTween = gsap.to(this.el, { volume: value, duration, ease: "sine.out" });
   }
 
+  /** Tắt tiếng bằng muted + pause: volume không đáng tin trên iOS. */
+  private setMutedState(muted: boolean) {
+    if (!this.el) return;
+    this.el.muted = muted;
+    if (muted) {
+      this.playAttempt++;
+      this.fadeTween?.kill();
+      this.el.pause();
+      return;
+    }
+    if (this.started) {
+      this.playAttempt++;
+      void this.el.play().catch((error) => {
+        console.warn("[audio] Chưa phát lại được nhạc nền:", error);
+      });
+      this.fadeTo(0.55, 0.45);
+    }
+  }
+
   toggle(): boolean {
     this.muted = !this.muted;
-    if (this.el) {
-      if (!this.started) void this.start();
-      else this.fadeTo(this.muted ? 0 : 0.55, 0.45);
-    }
+    this.setMutedState(this.muted);
+    if (!this.started && !this.muted) void this.start();
     this.emit();
     return this.muted;
   }
@@ -77,7 +101,7 @@ class AudioEngine {
   setMuted(m: boolean) {
     if (this.muted === m) return;
     this.muted = m;
-    if (this.el) this.fadeTo(m ? 0 : 0.55, 0.35);
+    this.setMutedState(m);
     this.emit();
   }
 
