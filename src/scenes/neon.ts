@@ -387,18 +387,18 @@ export class NeonScene {
   }
 
   dragBy(dx: number, dy: number) {
-    const k = 0.0045;
+    const k = 0.0031;
     // Ngang: quay không giới hạn 360°; dọc: ngẩng/cúi gần trọn vòng.
     this.drag.tx += dx * k;
     this.drag.ty = clamp(this.drag.ty + dy * k, -PITCH_LIMIT, PITCH_LIMIT);
-    this.drag.vx = dx * 0.00055;
-    this.drag.vy = dy * 0.00055;
+    this.drag.vx = dx * 0.00038;
+    this.drag.vy = dy * 0.00038;
   }
 
   endDrag() {
     // Quán tính nhẹ sau khi thả tay.
-    this.drag.tx += this.drag.vx * 10;
-    this.drag.ty = clamp(this.drag.ty + this.drag.vy * 10, -PITCH_LIMIT, PITCH_LIMIT);
+    this.drag.tx += this.drag.vx * 8;
+    this.drag.ty = clamp(this.drag.ty + this.drag.vy * 8, -PITCH_LIMIT, PITCH_LIMIT);
   }
 
   /** trả về true nếu tap trúng thẻ ảnh */
@@ -422,8 +422,8 @@ export class NeonScene {
     if (!this.group.visible) return;
 
     const reveal = this.revealState.value;
-    this.drag.x = damp(this.drag.x, this.drag.tx, 6.2, dt);
-    this.drag.y = damp(this.drag.y, this.drag.ty, 6.2, dt);
+    this.drag.x = damp(this.drag.x, this.drag.tx, 5.4, dt);
+    this.drag.y = damp(this.drag.y, this.drag.ty, 5.4, dt);
 
     // Camera bay quanh cụm không gian: ngang 360°, dọc gần trọn vòng.
     this.orbitDistance = damp(this.orbitDistance, ORBIT_RADIUS, 3.2, dt);
