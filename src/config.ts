@@ -25,8 +25,11 @@ export const config = {
   /** Ảnh đặt ở góc dưới-phải lá thư (hiển thị trong khung polaroid). */
   portraitCutout: "/photos/6.jpg",
 
-  /** Nhạc nền (loop). Bỏ trống "" nếu không muốn phát nhạc. */
-  music: "/audio/music.mp3",
+  /**
+   * Nhạc nền (loop). Bỏ trống "" nếu không muốn phát nhạc.
+   * Tăng ?v=... mỗi khi thay file để điện thoại không dùng bản cache cũ.
+   */
+  music: "/audio/music.mp3?v=2",
 
   /** Các dòng chữ neon trôi trong không gian (lặp ngẫu nhiên). */
   neonPhrases: [

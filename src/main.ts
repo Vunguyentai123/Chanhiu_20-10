@@ -37,6 +37,10 @@ class App {
   private dragging = false;
   private captionIndex = -1;
   private readonly reduced = prefersReducedMotion();
+  // Giới hạn DPR thấp hơn trên thiết bị cảm ứng để giữ 60fps.
+  private readonly dprCap = window.matchMedia("(pointer: coarse)").matches
+    ? Math.min(1.5, config.performance.maxPixelRatio)
+    : config.performance.maxPixelRatio;
   private onResize: () => void;
   private destroyed = false;
 
@@ -49,7 +53,7 @@ class App {
       alpha: true,
       powerPreference: "high-performance",
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, config.performance.maxPixelRatio));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.dprCap));
     this.renderer.setSize(stage.width, stage.height, false);
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -173,19 +177,29 @@ class App {
   }
 
   private bindHud() {
+    const unlockAudio = (event: Event) => {
+      // Để nút loa tự xử lý: chạm lần đầu vào nút sẽ bật nhạc,
+      // không bị handler toàn cục bật rồi click lại tắt ngay.
+      if ((event.target as HTMLElement | null)?.closest(".hud, button")) return;
+      if (!audio.hasStarted && !audio.isMuted) void audio.start();
+    };
+
     this.ui.soundBtn.addEventListener("click", () => {
-      audio.toggle();
+      if (!audio.hasStarted && !audio.isMuted) {
+        void audio.start();
+      } else {
+        audio.toggle();
+      }
     });
     this.ui.heartBtn.addEventListener("click", () => {
       if (this.sceneName === "neon") this.goToEnvelope();
     });
-    window.addEventListener(
-      "pointerdown",
-      () => {
-        if (!audio.hasStarted && !audio.isMuted) void audio.start();
-      },
-      { once: true, passive: true },
-    );
+
+    // Mobile cần một cử chỉ thật để mở khóa audio. Đăng ký cả pointer,
+    // touch và click vì từng loại máy/trình duyệt phát sinh sự kiện khác nhau.
+    window.addEventListener("pointerdown", unlockAudio, { once: true, passive: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true, passive: true });
+    window.addEventListener("click", unlockAudio, { once: true });
   }
 
   private bindInput() {
@@ -203,6 +217,10 @@ class App {
       },
       { passive: false },
     );
+
+    // Chặn bôi đen/kéo ảnh khi nhấn giữ trên mobile.
+    document.addEventListener("selectstart", (e) => e.preventDefault(), { passive: false });
+    document.addEventListener("dragstart", (e) => e.preventDefault());
   }
 
   private handlePointerDown = (e: PointerEvent) => {
@@ -292,7 +310,7 @@ class App {
 
   private resize() {
     const stage = getStage();
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, config.performance.maxPixelRatio));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.dprCap));
     this.renderer.setSize(stage.width, stage.height, false);
     this.camera.aspect = stage.width / stage.height;
     this.camera.updateProjectionMatrix();

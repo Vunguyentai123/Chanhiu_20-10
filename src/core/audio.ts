@@ -14,22 +14,29 @@ class AudioEngine {
     audio.loop = true;
     audio.preload = "auto";
     audio.volume = 0;
-    audio.crossOrigin = "anonymous";
+    audio.setAttribute("aria-hidden", "true");
+    audio.style.display = "none";
+    // Một số trình duyệt mobile chỉ phát ổn định khi thẻ media nằm trong DOM.
+    document.body.appendChild(audio);
     audio.addEventListener("error", () => {
       console.warn("[audio] Không tải được nhạc nền:", src);
     });
     this.el = audio;
+    // Bắt đầu tải sớm để lần chạm đầu tiên phát được ngay trên mobile.
+    audio.load();
   }
 
   async start() {
     if (!this.el || this.started) return;
     this.started = true;
+    this.el.volume = 0;
     try {
       await this.el.play();
-      this.fadeTo(this.muted ? 0 : 0.55, 2.4);
-    } catch {
-      // Autoplay bị chặn — thử lại ở lần chạm kế tiếp.
+      this.fadeTo(this.muted ? 0 : 0.55, 1.3);
+    } catch (error) {
+      // Autoplay bị chặn hoặc file chưa sẵn sàng - thử lại ở lần chạm kế tiếp.
       this.started = false;
+      console.warn("[audio] Chưa phát được nhạc nền:", error);
     }
     this.emit();
   }

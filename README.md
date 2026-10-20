@@ -104,8 +104,9 @@ Thay `public/audio/music.mp3` bằng bản nhạc bạn có quyền sử dụng.
 
 - Nhạc tự lặp, bắt đầu ở lần chạm/click đầu tiên (đúng chính sách autoplay của trình duyệt).
 - Âm lượng tăng dần đến 0.55; tự giảm nhẹ khi mở lightbox/thư.
-- File demo đi kèm dài ~42 giây, chỉ để thử nghiệm.
+- File demo đi kèm dài ~60 giây, chỉ để thử nghiệm.
 - Có thể dùng `.ogg`/`.m4a`; nhớ sửa `config.music` cho khớp tên file.
+- Trên mobile, nhạc chỉ bắt đầu sau lần chạm đầu tiên (chính sách autoplay). Nếu vẫn im lặng, kiểm tra công tắc Im lặng và âm lượng media của điện thoại.
 
 ### 5. Sửa lời chúc
 
