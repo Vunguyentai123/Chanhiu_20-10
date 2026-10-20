@@ -1,0 +1,22 @@
+{
+  "name": "gui-em-2010",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Thiệp chúc mừng 20/10 tương tác 3D, mobile-first",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "gsap": "^3.13.0",
+    "three": "^0.179.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.179.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
+  }
+}
