@@ -45,6 +45,11 @@ const SLOTS = [
 const BOUQUET_WIDTH_RATIO = 0.5;
 const IMAGE_ASPECT = 810 / 960;
 const BOUQUET_Y = -0.09;
+/**
+ * Ảnh nằm ở lớp trên, vẽ đè lên lớp dưới (đánh số theo thứ tự 1–6).
+ * Lớp dưới gồm ảnh 1 và 3.
+ */
+const TOP_LAYER_PHOTOS = new Set([2, 4, 5, 6]);
 
 export class BouquetScene {
   readonly group = new THREE.Group();
@@ -174,7 +179,7 @@ export class BouquetScene {
       const size = this.slotSize(slot.r, bw);
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size.x, size.y), material);
       mesh.position.copy(this.slotPosition(slot, bw, bh));
-      mesh.renderOrder = 3;
+      mesh.renderOrder = TOP_LAYER_PHOTOS.has(i + 1) ? 4 : 3;
       mesh.visible = false;
       this.group.add(mesh);
       this.photoLayers.push({
