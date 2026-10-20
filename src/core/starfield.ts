@@ -26,7 +26,13 @@ export class Starfield {
   private targetY = 0;
   private intensity = 1;
 
-  constructor(count = 380, warmCount = 28, _spread = 42, depth = 34) {
+  constructor(
+    count = 380,
+    warmCount = 28,
+    _spread = 42,
+    depth = 34,
+    spherical = false,
+  ) {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const total = reduced ? Math.round(count * 0.6) : count;
     const warmTotal = reduced ? Math.round(warmCount * 0.65) : warmCount;
@@ -48,6 +54,18 @@ export class Starfield {
         y: (Math.random() - 0.5) * 2 * halfH * margin,
       };
     };
+    // Khi nhìn 360°, sao phải bao quanh người xem thay vì chỉ nằm trước mặt.
+    const placeAround = (minRadius: number, maxRadius: number) => {
+      const theta = Math.random() * Math.PI * 2;
+      const cosPhi = Math.random() * 2 - 1;
+      const sinPhi = Math.sqrt(1 - cosPhi * cosPhi);
+      const r = minRadius + Math.random() * (maxRadius - minRadius);
+      return {
+        x: r * sinPhi * Math.cos(theta),
+        y: r * cosPhi,
+        z: r * sinPhi * Math.sin(theta),
+      };
+    };
 
     // Four star size families, so close stars read as crisp points and far
     // stars stay visible as tiny specks.
@@ -66,9 +84,13 @@ export class Starfield {
       const positions = new Float32Array(n * 3);
       const colors = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) {
-        const z = -Math.random() * depth;
-        const p = place(z);
-        positions.set([p.x, p.y, z], i * 3);
+        const p = spherical
+          ? placeAround(Math.max(7, depth * 0.42), depth * 1.05)
+          : (() => {
+              const z = -Math.random() * depth;
+              return { ...place(z), z };
+            })();
+        positions.set([p.x, p.y, p.z], i * 3);
         const warm = Math.random() < 0.13;
         const c = new THREE.Color(warm ? 0xffe2b8 : 0xfdf5ff);
         c.multiplyScalar(0.58 + Math.random() * 0.42);
@@ -117,9 +139,13 @@ export class Starfield {
       if (n <= 0) return;
       const positions = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) {
-        const z = -depth * 0.25 - Math.random() * depth * 0.7;
-        const p = place(z, 1.15);
-        positions.set([p.x, p.y, z], i * 3);
+        const p = spherical
+          ? placeAround(Math.max(10, depth * 0.5), depth * 1.1)
+          : (() => {
+              const z = -depth * 0.25 - Math.random() * depth * 0.7;
+              return { ...place(z, 1.15), z };
+            })();
+        positions.set([p.x, p.y, p.z], i * 3);
       }
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));

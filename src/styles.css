@@ -956,11 +956,15 @@ img {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: url("./assets/paper-grain.png");
   background-size: calc(180px * var(--scale));
   opacity: 0.16;
   mix-blend-mode: multiply;
   z-index: 1;
+}
+
+/* Chỉ tải vân giấy khi lá thư thật sự mở để giảm băng thông lúc khởi động. */
+.letter.is-visible .letter-paper::before {
+  background-image: url("./assets/paper-grain.webp");
 }
 
 .letter-paper::after {

@@ -86,6 +86,13 @@ export class UI {
 
   setLoaderVisible(visible: boolean) {
     this.loader.classList.toggle("is-done", !visible);
+    if (visible) return;
+    // Gỡ màn chờ tĩnh trong index.html sau khi cảnh đầu đã sẵn sàng.
+    const boot = document.getElementById("boot");
+    if (boot) {
+      boot.classList.add("is-done");
+      window.setTimeout(() => boot.remove(), 900);
+    }
   }
 
   setHint(text: string, visible = true, variant: "bouquet" | "neon" = "bouquet") {
@@ -210,7 +217,7 @@ export class UI {
   /** Pink analogue-glitch burst used for the bouquet → neon transition. */
   glitch(duration = 0.95) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const src = assetUrl("/assets/bouquet.png");
+    const src = assetUrl("/assets/bouquet.webp");
     const overlay = document.createElement("div");
     overlay.className = "glitch-overlay is-active";
     overlay.setAttribute("aria-hidden", "true");

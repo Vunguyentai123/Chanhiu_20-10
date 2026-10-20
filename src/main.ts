@@ -20,8 +20,11 @@ class App {
   private readonly scene = new THREE.Scene();
   private readonly clock = new THREE.Clock();
   private bouquet!: BouquetScene;
-  private neon!: NeonScene;
-  private envelope!: EnvelopeScene;
+  private neon: NeonScene | null = null;
+  private envelope: EnvelopeScene | null = null;
+  private neonReady: Promise<NeonScene> | null = null;
+  private envelopeReady: Promise<EnvelopeScene> | null = null;
+  private backgroundPrepScheduled = false;
   private sceneName: SceneName = "bouquet";
   private transitioning = false;
   private autoOpenTimer = 0;
@@ -115,8 +118,11 @@ class App {
       },
     });
     this.scene.add(this.bouquet.group);
+  }
 
-    this.neon = new NeonScene(this.camera, this.renderer, {
+  /** Dựng neon đúng một lần, sau khi cảnh bó hoa đã hiện. */
+  private buildNeonScene() {
+    return new NeonScene(this.camera, this.renderer, {
       onOpenCard: (src) => {
         audio.duck();
         this.ui.openLightbox(src, () => audio.unduck());
@@ -128,21 +134,45 @@ class App {
         if (caption) this.ui.setCaption(caption.text);
       },
     });
-    this.neon.group.visible = false;
-    this.scene.add(this.neon.group);
+  }
 
-    this.envelope = new EnvelopeScene({
-      onClose: () => this.closeEnvelope(),
-      onOpenLetter: () => {
-        audio.duck(0.18, 1.2);
-      },
-      onCaption: (text) => {
-        this.ui.setCaption(text);
-        this.ui.setCaptionVariant("envelope");
-        this.ui.setCaptionVisible(true);
-      },
-    });
-    this.ui.stage.appendChild(this.envelope.el);
+  private ensureNeon(): Promise<NeonScene> {
+    if (this.neon) return Promise.resolve(this.neon);
+    if (!this.neonReady) {
+      this.neonReady = (async () => {
+        // Chỉ chờ đúng font dùng để vẽ chữ neon, không chờ toàn bộ font của thiệp.
+        await loadNeonFont();
+        const neon = this.buildNeonScene();
+        neon.group.visible = false;
+        this.scene.add(neon.group);
+        this.neon = neon;
+        return neon;
+      })();
+    }
+    return this.neonReady;
+  }
+
+  private ensureEnvelope(): Promise<EnvelopeScene> {
+    if (this.envelope) return Promise.resolve(this.envelope);
+    if (!this.envelopeReady) {
+      this.envelopeReady = Promise.resolve().then(() => {
+        const envelope = new EnvelopeScene({
+          onClose: () => this.closeEnvelope(),
+          onOpenLetter: () => {
+            audio.duck(0.18, 1.2);
+          },
+          onCaption: (text) => {
+            this.ui.setCaption(text);
+            this.ui.setCaptionVariant("envelope");
+            this.ui.setCaptionVisible(true);
+          },
+        });
+        this.ui.stage.appendChild(envelope.el);
+        this.envelope = envelope;
+        return envelope;
+      });
+    }
+    return this.envelopeReady;
   }
 
   private async boot() {
@@ -150,30 +180,36 @@ class App {
     this.ui.setCaption("", false);
     this.ui.setCaptionVisible(false);
     this.ui.setCaptionVariant("bouquet");
-    await Promise.allSettled([this.bouquet.preload(), this.neon.preload()]);
-    // Cho font tiếng Việt load xong trước khi chụp texture neon
-    if (document.fonts?.ready) await document.fonts.ready;
-    this.neon.dispose();
-    // Dựng lại neon sau khi font sẵn sàng để texture chữ đúng dấu
-    this.scene.remove(this.neon.group);
-    this.neon = new NeonScene(this.camera, this.renderer, {
-      onOpenCard: (src) => {
-        audio.duck();
-        this.ui.openLightbox(src, () => audio.unduck());
-      },
-      onCaption: (index) => {
-        if (this.captionIndex === index) return;
-        this.captionIndex = index;
-        const caption = config.captions[index];
-        if (caption) this.ui.setCaption(caption.text);
-      },
-    });
-    this.neon.group.visible = false;
-    this.scene.add(this.neon.group);
+
+    // Chỉ chờ đúng tài nguyên của cảnh đầu. Neon, phong bì, font trang trí
+    // và nhạc được chuẩn bị sau khi màn hình chờ đã tắt.
+    await this.bouquet.preload();
 
     this.ui.setLoaderVisible(false);
     this.bouquet.start();
     this.animate();
+
+    this.scheduleBackgroundPrep();
+    window.setTimeout(() => audio.warm(), 1500);
+  }
+
+  private scheduleBackgroundPrep() {
+    if (this.backgroundPrepScheduled) return;
+    this.backgroundPrepScheduled = true;
+    const run = () => {
+      void this.ensureNeon();
+      void this.ensureEnvelope();
+    };
+    const idle = (
+      window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      }
+    ).requestIdleCallback;
+    // Ưu tiên khung hình đầu của bó hoa, rồi mới dựng cảnh sau trong lúc rảnh.
+    window.setTimeout(() => {
+      if (idle) idle(run, { timeout: 1600 });
+      else run();
+    }, 500);
   }
 
   private bindHud() {
@@ -192,7 +228,7 @@ class App {
       }
     });
     this.ui.heartBtn.addEventListener("click", () => {
-      if (this.sceneName === "neon") this.goToEnvelope();
+      if (this.sceneName === "neon") void this.goToEnvelope();
     });
 
     // Mobile cần một cử chỉ thật để mở khóa audio. Đăng ký cả pointer,
@@ -236,7 +272,7 @@ class App {
       this.bouquet.startHold();
     } else if (this.sceneName === "neon") {
       this.dragging = true;
-      this.neon.beginDrag();
+      this.neon?.beginDrag();
       stageSetPointerCapture(this.ui.stage, e.pointerId);
     }
   };
@@ -248,7 +284,7 @@ class App {
     const nx = (x / rect.width) * 2 - 1;
     const ny = -((y / rect.height) * 2 - 1);
     this.bouquet.setParallax(nx, ny);
-    this.neon.setParallax(nx, ny);
+    this.neon?.setParallax(nx, ny);
 
     if (!this.press.active) return;
     const dx = x - this.lastDrag.x;
@@ -259,7 +295,7 @@ class App {
     }
     this.lastDrag = { x, y };
     if (this.sceneName === "neon" && this.dragging) {
-      this.neon.dragBy(dx, dy);
+      this.neon?.dragBy(dx, dy);
     }
   };
 
@@ -268,7 +304,7 @@ class App {
     this.press.active = false;
     if (this.dragging) {
       this.dragging = false;
-      this.neon.endDrag();
+      this.neon?.endDrag();
       stageReleasePointerCapture(this.ui.stage, e.pointerId);
     }
     if (this.sceneName === "bouquet") this.bouquet.endHold();
@@ -292,7 +328,7 @@ class App {
         this.bouquet.tap(x, y);
       }
     } else if (this.sceneName === "neon") {
-      if (!this.neon.tap(ndcX, ndcY)) {
+      if (!this.neon?.tap(ndcX, ndcY)) {
         this.ui.ripple(x, y);
       }
     }
@@ -303,7 +339,7 @@ class App {
     this.bouquet.endHold();
     if (this.dragging) {
       this.dragging = false;
-      this.neon.endDrag();
+      this.neon?.endDrag();
       stageReleasePointerCapture(this.ui.stage, e.pointerId);
     }
   };
@@ -324,9 +360,18 @@ class App {
     this.ui.fadeCopy(false);
     audio.duck(0.32, 0.7);
 
+    try {
+      // Thường đã dựng xong trong lúc người xem chạm 6 bức ảnh.
+      await this.ensureNeon();
+    } catch (error) {
+      console.warn("[neon] Không dựng được cảnh neon:", error);
+      this.transitioning = false;
+      return;
+    }
+
     if (this.reduced) {
       await this.bouquet.exit();
-      this.enterNeon(0.5, false);
+      this.enterNeon(0.5);
       this.showNeonCopy();
       this.transitioning = false;
       this.armAutoEnvelope();
@@ -347,24 +392,14 @@ class App {
     this.armAutoEnvelope();
   }
 
-  private enterNeon(revealDuration: number, settleCamera: boolean) {
+  private enterNeon(revealDuration: number, settleCamera = false) {
+    const neon = this.neon;
+    if (!neon) return;
     gsap.killTweensOf(this.camera.position);
     this.sceneName = "neon";
-    this.neon.start(revealDuration);
-    this.neon.setVisible(true);
-    this.camera.rotation.set(0, 0, 0);
-    if (settleCamera) {
-      // Camera trôi chậm vào đường hầm trong lúc cảnh hiện dần.
-      this.camera.position.set(0, 0.05, 8.9);
-      gsap.to(this.camera.position, {
-        z: 8,
-        y: 0,
-        duration: 2.7,
-        ease: "power3.out",
-      });
-    } else {
-      this.camera.position.set(0, 0, 8);
-    }
+    // NeonScene tự đặt camera orbit quanh cụm không gian.
+    neon.start(revealDuration, settleCamera);
+    neon.setVisible(true);
     this.neonElapsed = 0;
     this.captionIndex = -1;
     this.ui.setCaptionVariant("neon");
@@ -386,11 +421,11 @@ class App {
         this.armAutoEnvelope();
         return;
       }
-      this.goToEnvelope();
+      void this.goToEnvelope();
     }, config.autoOpenEnvelopeAfterMs);
   }
 
-  private goToEnvelope() {
+  private async goToEnvelope() {
     if (this.transitioning || this.sceneName === "envelope") return;
     this.transitioning = true;
     window.clearTimeout(this.autoOpenTimer);
@@ -398,7 +433,16 @@ class App {
     this.ui.fadeCopy(true);
     this.ui.setCaptionVariant("envelope");
     this.ui.setCaptionVisible(true);
-    this.envelope.show();
+    let envelope: EnvelopeScene;
+    try {
+      envelope = await this.ensureEnvelope();
+    } catch (error) {
+      console.warn("[envelope] Không dựng được phong bì:", error);
+      this.transitioning = false;
+      return;
+    }
+    if (this.destroyed) return;
+    envelope.show();
     this.sceneName = "envelope";
     this.ui.setHeartVisible(false);
     this.ui.setHudVisible(false);
@@ -406,10 +450,10 @@ class App {
   }
 
   private closeEnvelope() {
-    this.envelope.hide();
+    this.envelope?.hide();
     this.ui.setHudVisible(true);
     if (config.closeLetterTo === "bouquet") {
-      this.neon.setVisible(false);
+      this.neon?.setVisible(false);
       this.bouquet.reset();
       this.bouquet.start();
       this.sceneName = "bouquet";
@@ -422,7 +466,7 @@ class App {
       this.enterNeon(1.3, false);
       this.showNeonCopy();
     }
-    window.setTimeout(() => this.envelope.reset(), 900);
+    window.setTimeout(() => this.envelope?.reset(), 900);
     audio.unduck(1.6);
   }
 
@@ -434,9 +478,9 @@ class App {
       this.bouquet.update(dt);
     } else if (this.sceneName === "neon") {
       this.neonElapsed += dt;
-      this.neon.update(dt);
+      this.neon?.update(dt);
     } else {
-      this.neon.starfield.update(dt);
+      this.neon?.starfield.update(dt);
     }
     this.renderer.render(this.scene, this.camera);
   };
@@ -445,14 +489,28 @@ class App {
     this.destroyed = true;
     window.clearTimeout(this.autoOpenTimer);
     this.bouquet.dispose();
-    this.neon.dispose();
-    this.envelope.dispose();
+    this.neon?.dispose();
+    this.envelope?.dispose();
     this.renderer.dispose();
   }
 }
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+}
+
+/**
+ * Canvas không tự kích hoạt @font-face như DOM, nên phải tải đúng font
+ * Quicksand 700 (kèm dấu tiếng Việt) trước khi vẽ texture neon.
+ */
+async function loadNeonFont() {
+  if (!document.fonts?.load) return;
+  const sample = config.neonPhrases.join(" ") || "Chúc mừng ngày 20/10";
+  try {
+    await Promise.race([document.fonts.load('700 104px "Quicksand"', sample), wait(3000)]);
+  } catch {
+    /* fallback font vẫn dùng được */
+  }
 }
 
 function stageSetPointerCapture(el: HTMLElement, id: number) {

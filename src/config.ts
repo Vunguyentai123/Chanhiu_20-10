@@ -10,20 +10,26 @@ export const config = {
   recipientName: "Em",
 
   /**
-   * 6 ảnh: 3 ảnh hàng trên (trái, giữa, phải), 2 ảnh hàng giữa (trái, phải),
-   * 1 ảnh lớn ở giữa dưới. Đặt file trong /public/photos.
+   * 10 ảnh dùng trong thiệp:
+   * - 1–6: bó hoa (3 ảnh hàng trên, 2 ảnh hàng giữa, 1 ảnh lớn giữa-dưới).
+   * - 1–10: các thẻ ảnh trôi trong không gian neon.
+   * Đặt file trong /public/photos.
    */
   photos: [
-    "/photos/1.jpg",
-    "/photos/2.jpg",
-    "/photos/3.jpg",
-    "/photos/4.jpg",
-    "/photos/5.jpg",
-    "/photos/6.jpg",
+    "/photos/1.webp",
+    "/photos/2.webp",
+    "/photos/3.webp",
+    "/photos/4.webp",
+    "/photos/5.webp",
+    "/photos/6.webp",
+    "/photos/7.webp",
+    "/photos/8.webp",
+    "/photos/9.webp",
+    "/photos/10.webp",
   ],
 
   /** Ảnh đặt ở góc dưới-phải lá thư (hiển thị trong khung polaroid). */
-  portraitCutout: "/photos/6.jpg",
+  portraitCutout: "/photos/6.webp",
 
   /**
    * Nhạc nền (loop). Bỏ trống "" nếu không muốn phát nhạc.
@@ -60,7 +66,7 @@ export const config = {
   hints: {
     bouquet1: "Chạm vào bó hoa",
     bouquet2: "Ấn giữ bó hoa",
-    neon: "Kéo để ngắm không gian",
+    neon: "Kéo để xoay 360°",
     envelope: "Chạm phong bì để mở thư",
   },
 
@@ -92,10 +98,10 @@ export const config = {
   /** Cài đặt hiệu năng / mỹ thuật (thường không cần sửa). */
   performance: {
     maxPixelRatio: 2,
-    maxNeonPhrases: 150,
-    maxStars: 420,
+    maxNeonPhrases: 96,
+    maxStars: 520,
     maxHearts: 90,
-    maxPhotoCards: 12,
+    maxPhotoCards: 18,
   },
 };
 

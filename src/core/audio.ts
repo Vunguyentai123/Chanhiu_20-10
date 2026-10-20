@@ -6,13 +6,16 @@ class AudioEngine {
   private muted = false;
   private listeners = new Set<(state: { muted: boolean; started: boolean }) => void>();
   private fadeTween: gsap.core.Tween | null = null;
+  private warmed = false;
 
   init(src: string) {
     if (!src) return;
     const audio = new Audio();
     audio.src = src;
     audio.loop = true;
-    audio.preload = "auto";
+    // Chưa tải file nhạc lúc khởi động: 0.9 MB nhạc sẽ tranh băng thông
+    // với ảnh bó hoa và làm màn hình chờ lâu hơn.
+    audio.preload = "none";
     audio.volume = 0;
     audio.setAttribute("aria-hidden", "true");
     audio.style.display = "none";
@@ -22,14 +25,28 @@ class AudioEngine {
       console.warn("[audio] Không tải được nhạc nền:", src);
     });
     this.el = audio;
-    // Bắt đầu tải sớm để lần chạm đầu tiên phát được ngay trên mobile.
-    audio.load();
+  }
+
+  /** Tải nhạc sau khi cảnh đầu đã hiện, để không chặn lúc khởi động. */
+  warm() {
+    if (!this.el || this.started || this.warmed) return;
+    this.warmed = true;
+    this.el.preload = "auto";
+    try {
+      this.el.load();
+    } catch {
+      /* ignore */
+    }
   }
 
   async start() {
     if (!this.el || this.started) return;
     this.started = true;
     this.el.volume = 0;
+    if (!this.warmed) {
+      this.warmed = true;
+      this.el.preload = "auto";
+    }
     try {
       await this.el.play();
       this.fadeTo(this.muted ? 0 : 0.55, 1.3);

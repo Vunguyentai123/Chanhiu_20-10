@@ -132,29 +132,31 @@ export class BouquetScene {
     this.bouquetGlow.renderOrder = 1;
     this.group.add(this.bouquetGlow);
 
-    const bouquetTex = new THREE.TextureLoader().load(
-      assetUrl("/assets/bouquet.png"),
+    const loader = new THREE.TextureLoader();
+    const bouquet = loadTexture(
+      loader,
+      assetUrl("/assets/bouquet.webp"),
       (t) => {
         t.colorSpace = THREE.SRGBColorSpace;
         t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       },
-      undefined,
       () => console.warn("[bouquet] Không tải được ảnh bó hoa"),
     );
-    bouquetTex.colorSpace = THREE.SRGBColorSpace;
-    this.textures.push(bouquetTex);
-    this.bouquetMaterial.map = bouquetTex;
+    bouquet.texture.colorSpace = THREE.SRGBColorSpace;
+    this.textures.push(bouquet.texture);
+    this.bouquetMaterial.map = bouquet.texture;
     this.bouquetMaterial.needsUpdate = true;
+    this.preloads.push(bouquet.loaded);
 
-    const loader = new THREE.TextureLoader();
     const ovalMask = makeOvalMask();
     this.textures.push(ovalMask);
     config.photos.slice(0, 6).forEach((src, i) => {
       const photoSrc = assetUrl(src);
-      const texture = loader.load(photoSrc, (t) => {
+      const photo = loadTexture(loader, photoSrc, (t) => {
         t.colorSpace = THREE.SRGBColorSpace;
         t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       });
+      const texture = photo.texture;
       texture.colorSpace = THREE.SRGBColorSpace;
       this.textures.push(texture);
       const material = new THREE.MeshBasicMaterial({
@@ -180,7 +182,7 @@ export class BouquetScene {
         base: mesh.position.clone(),
         filled: false,
       });
-      this.preloads.push(loadImage(photoSrc));
+      this.preloads.push(photo.loaded);
     });
 
     const count = this.reduced ? 240 : 620;
@@ -228,7 +230,6 @@ export class BouquetScene {
     this.shatterVel = vel;
     this.group.add(this.shatter);
 
-    this.preloads.push(loadImage(assetUrl("/assets/bouquet.png")));
     this.unsubResize = onStageResize(() => this.layout());
     this.layout();
   }
@@ -325,14 +326,21 @@ export class BouquetScene {
   start() {
     this.started = true;
     this.camTween?.kill();
+    // Neon dùng ống kính rộng hơn; trả bó hoa về đúng khung ban đầu.
+    if (this.camera.fov !== 48) {
+      this.camera.fov = 48;
+      this.camera.updateProjectionMatrix();
+    }
+    // Camera neon có thể đang orbit lệch tâm; trả cả vị trí lẫn hướng về mặc định.
+    this.camera.rotation.set(0, 0, 0);
     if (this.reduced) {
       this.camera.position.set(0, BOUQUET_Y, this.baseCamZ);
       return;
     }
     this.camTween = gsap.fromTo(
       this.camera.position,
-      { z: this.baseCamZ + 1.8, y: 0.32 },
-      { z: this.baseCamZ, y: BOUQUET_Y, duration: 2.8, ease: "power3.out" },
+      { x: 0, z: this.baseCamZ + 1.8, y: 0.32 },
+      { x: 0, z: this.baseCamZ, y: BOUQUET_Y, duration: 2.8, ease: "power3.out" },
     );
   }
 
@@ -595,13 +603,34 @@ export class BouquetScene {
   }
 }
 
-function loadImage(src: string): Promise<void> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = () => resolve();
-    img.src = src;
+/**
+ * Tải texture và trả kèm promise của chính lần tải đó.
+ * Trước đây mỗi ảnh bị tải hai lần (TextureLoader + Image preload),
+ * làm tăng gấp đôi băng thông lúc khởi động.
+ */
+function loadTexture(
+  loader: THREE.TextureLoader,
+  url: string,
+  onLoaded?: (texture: THREE.Texture) => void,
+  onError?: () => void,
+): { texture: THREE.Texture; loaded: Promise<void> } {
+  let resolveLoaded!: () => void;
+  const loaded = new Promise<void>((resolve) => {
+    resolveLoaded = resolve;
   });
+  const texture = loader.load(
+    url,
+    (t) => {
+      onLoaded?.(t);
+      resolveLoaded();
+    },
+    undefined,
+    () => {
+      onError?.();
+      resolveLoaded();
+    },
+  );
+  return { texture, loaded };
 }
 
 function smoothstep(edge0: number, edge1: number, x: number) {

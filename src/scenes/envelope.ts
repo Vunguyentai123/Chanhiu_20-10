@@ -38,8 +38,8 @@ export class EnvelopeScene {
         <div class="envelope" role="button" tabindex="0" aria-label="${escapeHtml(config.hints.envelope)}">
           <div class="env-back"></div>
           <div class="env-front"></div>
-          <img class="env-floral env-floral--left" src="${assetUrl("/assets/corner-left.png")}" alt="" aria-hidden="true" />
-          <img class="env-floral env-floral--right" src="${assetUrl("/assets/corner-right.png")}" alt="" aria-hidden="true" />
+          <img class="env-floral env-floral--left" src="${assetUrl("/assets/corner-left.webp")}" alt="" aria-hidden="true" />
+          <img class="env-floral env-floral--right" src="${assetUrl("/assets/corner-right.webp")}" alt="" aria-hidden="true" />
           <div class="env-text">
             <p class="to">${escapeHtml(config.envelope.to)}</p>
             <div class="env-rule"><i></i>${HEART_SVG}<i></i></div>
@@ -60,10 +60,10 @@ export class EnvelopeScene {
       </div>
       <article class="letter" aria-label="Lá thư chúc mừng">
         <div class="letter-paper">
-          <img class="letter-top" src="${assetUrl("/assets/corner-right.png")}" alt="" aria-hidden="true" />
+          <img class="letter-top" src="${assetUrl("/assets/corner-right.webp")}" alt="" aria-hidden="true" />
           <h2 class="letter-title">${escapeHtml(config.letter.title)}</h2>
           <div class="letter-body"></div>
-          <img class="letter-flowers" src="${assetUrl("/assets/corner-left.png")}" alt="" aria-hidden="true" />
+          <img class="letter-flowers" src="${assetUrl("/assets/corner-left.webp")}" alt="" aria-hidden="true" />
           <div class="letter-portrait">
             <img src="${assetUrl(config.portraitCutout)}" alt="Chân dung người nhận" />
           </div>

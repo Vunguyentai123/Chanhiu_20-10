@@ -4,7 +4,7 @@
  * - deploy ở thư mục con kiểu GitHub Pages (BASE_URL = "./")
  * - deploy ở domain riêng / Vercel / Netlify (BASE_URL = "/")
  *
- * Chấp nhận cả "/photos/1.jpg", "photos/1.jpg" và URL tuyệt đối.
+ * Chấp nhận cả "/photos/1.webp", "photos/1.webp" và URL tuyệt đối.
  */
 export function assetUrl(path: string): string {
   if (!path) return path;

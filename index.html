@@ -20,16 +20,79 @@
       type="font/woff2"
       crossorigin
     />
+    <!-- Ảnh bó hoa là tài nguyên chính của cảnh đầu; tải song song với JS. -->
     <link
       rel="preload"
-      href="/src/assets/fonts/dancing-script-600-normal-vietnamese.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
+      href="/assets/bouquet.webp"
+      as="image"
+      type="image/webp"
+      fetchpriority="high"
     />
+    <!-- 6 ảnh của cảnh đầu: tải song song với JS thay vì chờ JS khởi động. -->
+    <link rel="preload" href="/photos/1.webp" as="image" type="image/webp" />
+    <link rel="preload" href="/photos/2.webp" as="image" type="image/webp" />
+    <link rel="preload" href="/photos/3.webp" as="image" type="image/webp" />
+    <link rel="preload" href="/photos/4.webp" as="image" type="image/webp" />
+    <link rel="preload" href="/photos/5.webp" as="image" type="image/webp" />
+    <link rel="preload" href="/photos/6.webp" as="image" type="image/webp" />
+    <style>
+      /* Màn chờ tĩnh: hiện ngay khi HTML được parse, không chờ tải Three.js. */
+      #boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background:
+          radial-gradient(70% 50% at 50% 48%, rgba(55, 15, 38, 0.35), transparent 72%),
+          #030305;
+        color: rgba(255, 236, 246, 0.56);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 14px;
+        font-style: italic;
+        letter-spacing: 0.06em;
+        transition:
+          opacity 0.8s ease,
+          visibility 0.8s ease;
+      }
+      #boot.is-done {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .boot__dots {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .boot__dots span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #ff8bcb;
+        box-shadow:
+          0 0 12px rgba(255, 79, 216, 0.9),
+          0 0 28px rgba(255, 47, 160, 0.5);
+        animation: boot-pulse 1.35s ease-in-out infinite;
+      }
+      .boot__dots span:nth-child(2) { animation-delay: 0.18s; }
+      .boot__dots span:nth-child(3) { animation-delay: 0.36s; }
+      @keyframes boot-pulse {
+        0%, 100% { opacity: 0.22; transform: scale(0.8); }
+        45% { opacity: 1; transform: scale(1.16); }
+      }
+      #boot p { margin: 0; }
+    </style>
   </head>
   <body>
     <div id="app"></div>
+    <div id="boot" role="status" aria-live="polite">
+      <div class="boot__dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p>Đang chuẩn bị một chút yêu thương…</p>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -12,26 +12,34 @@ type NeonOptions = {
 
 type TextSprite = {
   sprite: THREE.Sprite;
-  baseZ: number;
+  baseY: number;
   speed: number;
-  drift: number;
   phase: number;
   baseOpacity: number;
 };
 
 type CardMesh = {
   mesh: THREE.Mesh;
-  baseZ: number;
+  baseY: number;
   speed: number;
   phase: number;
   photo: string;
   baseRot: number;
+  tiltX: number;
+  tiltY: number;
   baseOpacity: number;
 };
 
-const TUNNEL_DEPTH = 46;
-const TUNNEL_NEAR = 6.2;
-const CAMERA_Z = 8;
+/** Tâm cụm không gian 3D; camera quay quanh tâm này. */
+const ORBIT_CENTER = new THREE.Vector3(0, 0, -13);
+const ORBIT_RADIUS = 21;
+/** Vị trí camera ban đầu (khi yaw = pitch = 0). */
+const START_CAMERA = new THREE.Vector3(0, 0, ORBIT_CENTER.z + ORBIT_RADIUS);
+/** Ống kính rộng hơn để thấy nhiều lớp ảnh/chữ khi xoay quanh cụm. */
+const NEON_FOV = 62;
+const TAU = Math.PI * 2;
+/** Giới hạn ngẩng/cúi để không bị lộn ngược, vẫn nhìn gần như trọn 360°. */
+const PITCH_LIMIT = THREE.MathUtils.degToRad(84);
 
 export class NeonScene {
   readonly group = new THREE.Group();
@@ -41,7 +49,7 @@ export class NeonScene {
   private readonly reduced: boolean;
   private readonly textSprites: TextSprite[] = [];
   private readonly cards: CardMesh[] = [];
-  private readonly cardMaterials: THREE.MeshBasicMaterial[] = [];
+  private readonly nebulaMaterials: THREE.SpriteMaterial[] = [];
   private readonly textures: THREE.Texture[] = [];
   private hearts!: THREE.Points;
   private heartBase!: Float32Array;
@@ -51,14 +59,12 @@ export class NeonScene {
   private readonly pointer = new THREE.Vector2();
   private readonly tilt = new THREE.Group();
   private readonly drag = { x: 0, y: 0, tx: 0, ty: 0, vx: 0, vy: 0 };
+  private orbitDistance = ORBIT_RADIUS;
   private time = 0;
   private started = false;
   private unsubResize: () => void;
   private captionIndex = -1;
   private captionElapsed = 0;
-  private heroCard: CardMesh | null = null;
-  private heroTimer = 3.5;
-  private baseSpread = new THREE.Vector2(16, 22);
   private readonly revealState = { value: 0 };
   private revealTween: gsap.core.Tween | null = null;
 
@@ -68,13 +74,23 @@ export class NeonScene {
     this.reduced = prefersReducedMotion();
     this.group.visible = false;
 
-    this.starfield = new Starfield(this.reduced ? 240 : 400, this.reduced ? 14 : 26, 34, 30);
-    this.starfield.group.position.z = -6;
+    // Vũ trụ sao bao quanh cụm không gian; camera quay quanh cụm nên luôn nằm trong.
+    this.starfield = new Starfield(
+      this.reduced ? 300 : config.performance.maxStars,
+      this.reduced ? 18 : 34,
+      34,
+      72,
+      true,
+    );
+    this.starfield.group.position.copy(ORBIT_CENTER);
     this.group.add(this.starfield.group);
 
-    this.tilt.rotation.z = THREE.MathUtils.degToRad(-9.5);
+    // Cả cụm ảnh/chữ nằm quanh tâm; camera orbit quanh tâm để xoay 360°.
+    this.tilt.position.copy(ORBIT_CENTER);
+    this.tilt.rotation.z = THREE.MathUtils.degToRad(-3.5);
     this.group.add(this.tilt);
 
+    this.addNebula();
     this.buildText();
     this.buildCards();
     this.buildHearts();
@@ -83,17 +99,48 @@ export class NeonScene {
     this.layout();
   }
 
+  /** Những đám sương hồng tím phía sau cụm, giúp không gian có chiều sâu. */
+  private addNebula() {
+    const tex = makeNebulaTexture();
+    this.textures.push(tex);
+    const specs = [
+      { x: 0, y: 0, z: -2, scale: 48, color: 0xff3d9a, opacity: 0.34 },
+      { x: -13, y: 5, z: -8, scale: 30, color: 0x8a5cff, opacity: 0.2 },
+      { x: 12, y: -6, z: -6, scale: 26, color: 0xff78c8, opacity: 0.16 },
+    ];
+    for (const spec of specs) {
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        color: spec.color,
+        opacity: 0,
+        toneMapped: false,
+        fog: false,
+      });
+      mat.userData.baseOpacity = spec.opacity;
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.set(spec.x, spec.y, spec.z);
+      sprite.scale.set(spec.scale, spec.scale, 1);
+      sprite.renderOrder = 0;
+      this.tilt.add(sprite);
+      this.nebulaMaterials.push(mat);
+    }
+  }
+
   private buildText() {
     const max = this.reduced ? 48 : config.performance.maxNeonPhrases;
     const phrases = config.neonPhrases.length ? config.neonPhrases : ["20/10"];
     const buckets = [0.13, 0.19, 0.3, 0.5];
+    // Mỗi câu chỉ cần một texture; trước đây texture được tạo lại cho từng
+    // "bucket" dù nội dung giống hệt, làm tăng gấp nhiều lần thời gian dựng.
     const textures = new Map<string, THREE.Texture>();
-    const getTex = (phrase: string, bucket: number) => {
-      const key = `${phrase}__${bucket}`;
-      let tex = textures.get(key);
+    const getTex = (phrase: string) => {
+      let tex = textures.get(phrase);
       if (!tex) {
-        tex = makeNeonTexture(phrase, bucket);
-        textures.set(key, tex);
+        tex = makeNeonTexture(phrase);
+        textures.set(phrase, tex);
         this.textures.push(tex);
       }
       return tex;
@@ -101,13 +148,25 @@ export class NeonScene {
 
     for (let i = 0; i < max; i++) {
       const phrase = phrases[i % phrases.length];
-      // Vài cụm lớn nằm gần camera, phần còn lại rải suốt đường hầm.
-      const near = i < 9;
-      const bucket = near
-        ? buckets[i < 4 ? 3 : 2]
-        : buckets[Math.floor(Math.random() * buckets.length)];
-      const tex = getTex(phrase, bucket);
-      const baseOpacity = near ? 0.82 + Math.random() * 0.12 : 0.46 + Math.random() * 0.26;
+      // 12 cung quanh tâm, mỗi cung một cụm lớn; phần còn lại rải thành các lớp sâu.
+      const near = i < 12;
+      const sector = (near ? i : i - 12) % 12;
+      let pitch = 0;
+      let radius = 0;
+      let bucket = buckets[Math.floor(Math.random() * buckets.length)];
+      if (near) {
+        pitch = THREE.MathUtils.degToRad(
+          i % 2 === 0 ? 8 + Math.random() * 24 : -38 + Math.random() * 26,
+        );
+        radius = 6.2 + Math.random() * 3;
+        bucket = i < 4 || Math.random() < 0.35 ? buckets[3] : buckets[2];
+      } else {
+        pitch = THREE.MathUtils.degToRad((Math.random() * 2 - 1) * 72);
+        radius = 3.5 + Math.random() * 8;
+      }
+      const yaw = (sector / 12) * TAU + (Math.random() - 0.5) * 0.3;
+      const tex = getTex(phrase);
+      const baseOpacity = near ? 0.8 + Math.random() * 0.14 : 0.46 + Math.random() * 0.24;
       const material = new THREE.SpriteMaterial({
         map: tex,
         transparent: true,
@@ -118,13 +177,7 @@ export class NeonScene {
         toneMapped: false,
       });
       const sprite = new THREE.Sprite(material);
-      const z = near
-        ? -2.5 - Math.random() * 8
-        : TUNNEL_NEAR - 7 - Math.random() * (TUNNEL_DEPTH - 7);
-      const spread = this.spreadAt(z);
-      const x = (Math.random() - 0.5) * spread.x * 0.96;
-      const y = (Math.random() - 0.5) * spread.y * 0.9;
-      sprite.position.set(x, y, z);
+      sprite.position.copy(pointOnSphere(radius, yaw, pitch));
       const aspect = tex.userData.aspect as number;
       const baseH = bucket;
       sprite.scale.set(baseH * aspect, baseH, 1);
@@ -133,9 +186,8 @@ export class NeonScene {
       this.tilt.add(sprite);
       this.textSprites.push({
         sprite,
-        baseZ: z,
-        speed: near ? 0.42 : 0.9 + Math.random() * 2.1,
-        drift: (Math.random() - 0.5) * 0.22,
+        baseY: sprite.position.y,
+        speed: near ? 0.002 + Math.random() * 0.005 : 0.005 + Math.random() * 0.014,
         phase: Math.random() * Math.PI * 2,
         baseOpacity,
       });
@@ -143,12 +195,23 @@ export class NeonScene {
   }
 
   private buildCards() {
-    const count = this.reduced ? 6 : config.performance.maxPhotoCards;
-    const photos = (config.photos.length ? config.photos : ["/photos/1.jpg"]).map(assetUrl);
+    const count = this.reduced
+      ? Math.min(config.photos.length, 10)
+      : config.performance.maxPhotoCards;
+    const photos = (config.photos.length ? config.photos : ["/photos/1.webp"]).map(assetUrl);
+    const cardTextures = new Map<string, THREE.Texture>();
+    // Rải ảnh theo các cung 30°, giữ độ cao vừa phải để không bị cắt quá nhiều.
+    const pitchPattern = [-30, 14, -8, 36, -36, 6, 28, -20, 0, 34, -32, 18, -16, 38, -6, 24];
+    const radiusPattern = [8.5, 10.2, 7.2, 9.6, 8, 11, 9, 10.8, 7.8, 9.4, 10.6, 8.2, 11.2, 7, 9.8, 10];
     for (let i = 0; i < count; i++) {
       const photo = photos[i % photos.length];
-      const tex = makeCardTexture(photo);
-      this.textures.push(tex);
+      // Nhiều thẻ có thể dùng chung một ảnh: chia sẻ texture để không vẽ lại canvas.
+      let tex = cardTextures.get(photo);
+      if (!tex) {
+        tex = makeCardTexture(photo);
+        cardTextures.set(photo, tex);
+        this.textures.push(tex);
+      }
       const mat = new THREE.MeshBasicMaterial({
         map: tex,
         transparent: true,
@@ -159,37 +222,43 @@ export class NeonScene {
         fog: false,
       });
       const aspect = tex.userData.aspect as number;
-      const baseH = i === 0 ? 2.15 : 0.95 + Math.random() * 1.15;
+      const hero = i === 0;
+      const baseH = hero ? 2.15 : 0.9 + Math.random() * 1.2;
       const geo = new THREE.PlaneGeometry(baseH * aspect, baseH);
       const mesh = new THREE.Mesh(geo, mat);
-      const z =
-        i === 0
-          ? -1.2
-          : TUNNEL_NEAR - 8 - ((i - 1) / Math.max(1, count - 1)) * (TUNNEL_DEPTH - 9) -
-            Math.random() * 2.2;
-      const spread = this.spreadAt(z);
-      if (i === 0) {
-        mesh.position.set(-spread.x * 0.09, -spread.y * 0.13, z);
-      } else {
-        mesh.position.set(
-          (Math.random() - 0.5) * spread.x * 0.9,
-          (Math.random() - 0.5) * spread.y * 0.82,
-          z,
-        );
+
+      // Rải ảnh thành nhiều lớp trong cụm; mỗi cung 30° đều có ảnh.
+      let yaw = Math.PI + 0.1;
+      let pitch = THREE.MathUtils.degToRad(-7);
+      let radius = 8.4;
+      if (!hero) {
+        const sector = (i - 1) % 12;
+        yaw = (sector / 12) * TAU + (Math.random() - 0.5) * 0.2;
+        pitch = THREE.MathUtils.degToRad(pitchPattern[i % pitchPattern.length]);
+        radius = radiusPattern[i % radiusPattern.length];
       }
-      const baseRot = (Math.random() - 0.5) * 0.18;
-      mesh.rotation.z = baseRot;
+      mesh.position.copy(pointOnSphere(radius, yaw, pitch));
+
+      const baseRot = (Math.random() - 0.5) * 0.16;
+      const tiltX = hero ? 0 : (Math.random() - 0.5) * 0.24;
+      const tiltY = hero ? 0 : (Math.random() - 0.5) * 0.3;
       mesh.renderOrder = 3;
       this.tilt.add(mesh);
-      this.cardMaterials.push(mat);
+      mesh.lookAt(START_CAMERA);
+      mesh.rotateX(tiltX);
+      mesh.rotateY(tiltY);
+      mesh.rotateZ(baseRot);
+
       this.cards.push({
         mesh,
-        baseZ: z,
-        speed: i === 0 ? 0.12 : 0.7 + Math.random() * 1.3,
+        baseY: mesh.position.y,
+        speed: hero ? 0.0015 : 0.003 + Math.random() * 0.012,
         phase: Math.random() * Math.PI * 2,
         photo,
         baseRot,
-        baseOpacity: i === 0 ? 1 : 0.78 + Math.random() * 0.16,
+        tiltX,
+        tiltY,
+        baseOpacity: hero ? 1 : 0.64 + Math.random() * 0.28,
       });
     }
   }
@@ -202,14 +271,14 @@ export class NeonScene {
     const speed = new Float32Array(count);
     const phase = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      const z = -Math.random() * TUNNEL_DEPTH;
-      const spread = this.spreadAt(z);
-      const x = (Math.random() - 0.5) * spread.x * 0.92;
-      const y = (Math.random() - 0.5) * spread.y * 0.86;
-      positions.set([x, y, z], i * 3);
-      base.set([x, y, z], i * 3);
+      const yaw = Math.random() * TAU;
+      const pitch = THREE.MathUtils.degToRad((Math.random() * 2 - 1) * 76);
+      const radius = 4 + Math.random() * 8.5;
+      const p = pointOnSphere(radius, yaw, pitch);
+      positions.set([p.x, p.y, p.z], i * 3);
+      base.set([p.x, p.y, p.z], i * 3);
       sizes[i] = 0.16 + Math.random() * 0.4;
-      speed[i] = 0.4 + Math.random() * 1.1;
+      speed[i] = 0.012 + Math.random() * 0.035;
       phase[i] = Math.random() * Math.PI * 2;
     }
     const geo = new THREE.BufferGeometry();
@@ -234,43 +303,38 @@ export class NeonScene {
     this.tilt.add(this.hearts);
   }
 
-  private spreadAt(z: number) {
-    const dist = CAMERA_Z - z;
-    const vh = 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * dist;
-    const stage = getStage();
-    return new THREE.Vector2(vh * (stage.width / stage.height), vh);
-  }
-
   private layout() {
     const stage = getStage();
     this.camera.aspect = stage.width / stage.height;
     this.camera.updateProjectionMatrix();
-    const s = this.spreadAt(-30);
-    this.baseSpread.set(s.x, s.y);
   }
 
-  async preload() {
-    await Promise.allSettled(
-      config.photos.map(
-        (src) =>
-          new Promise<void>((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-            img.src = assetUrl(src);
-          }),
-      ),
-    );
-  }
-
-  start(revealDuration = 1.9) {
+  start(revealDuration = 1.9, settleCamera = false) {
     this.started = true;
     this.group.visible = true;
-    this.heroTimer = 3.2;
     this.captionIndex = -1;
     this.captionElapsed = 0;
 
-    // Fade the whole tunnel in instead of popping it on screen.
+    // Mỗi lần vào lại đều bắt đầu hướng nhìn chính giữa.
+    this.drag.x = 0;
+    this.drag.y = 0;
+    this.drag.tx = 0;
+    this.drag.ty = 0;
+    this.drag.vx = 0;
+    this.drag.vy = 0;
+    if (this.camera.fov !== NEON_FOV) {
+      this.camera.fov = NEON_FOV;
+      this.camera.updateProjectionMatrix();
+    }
+    this.orbitDistance = settleCamera ? ORBIT_RADIUS + 1.2 : ORBIT_RADIUS;
+    this.camera.position.set(
+      ORBIT_CENTER.x,
+      ORBIT_CENTER.y,
+      ORBIT_CENTER.z + this.orbitDistance,
+    );
+    this.camera.lookAt(ORBIT_CENTER);
+
+    // Fade the whole space in instead of popping it on screen.
     this.revealTween?.kill();
     this.revealState.value = 0;
     this.applyReveal(0);
@@ -281,9 +345,9 @@ export class NeonScene {
     });
     gsap.fromTo(
       this.tilt.rotation,
-      { z: THREE.MathUtils.degToRad(-11.8) },
+      { z: THREE.MathUtils.degToRad(-6) },
       {
-        z: THREE.MathUtils.degToRad(-9.5),
+        z: THREE.MathUtils.degToRad(-3.5),
         duration: revealDuration + 0.5,
         ease: "power3.out",
       },
@@ -298,6 +362,9 @@ export class NeonScene {
     }
     for (const c of this.cards) {
       (c.mesh.material as THREE.MeshBasicMaterial).opacity = c.baseOpacity * r;
+    }
+    for (const m of this.nebulaMaterials) {
+      m.opacity = (m.userData.baseOpacity as number) * r;
     }
     (this.hearts.material as THREE.PointsMaterial).opacity = 0.86 * r;
   }
@@ -320,33 +387,28 @@ export class NeonScene {
   }
 
   dragBy(dx: number, dy: number) {
-    const k = 0.0018;
-    this.drag.tx = clamp(this.drag.tx + dx * k, -0.24, 0.24);
-    this.drag.ty = clamp(this.drag.ty + dy * k, -0.16, 0.16);
-    this.drag.vx = dx * 0.0009;
-    this.drag.vy = dy * 0.0009;
+    const k = 0.0045;
+    // Ngang: quay không giới hạn 360°; dọc: ngẩng/cúi gần trọn vòng.
+    this.drag.tx += dx * k;
+    this.drag.ty = clamp(this.drag.ty + dy * k, -PITCH_LIMIT, PITCH_LIMIT);
+    this.drag.vx = dx * 0.00055;
+    this.drag.vy = dy * 0.00055;
   }
 
   endDrag() {
-    // inertia: nudge targets in the direction of the fling
-    this.drag.tx = clamp(this.drag.tx + this.drag.vx * 12, -0.28, 0.28);
-    this.drag.ty = clamp(this.drag.ty + this.drag.vy * 10, -0.18, 0.18);
+    // Quán tính nhẹ sau khi thả tay.
+    this.drag.tx += this.drag.vx * 10;
+    this.drag.ty = clamp(this.drag.ty + this.drag.vy * 10, -PITCH_LIMIT, PITCH_LIMIT);
   }
 
   /** trả về true nếu tap trúng thẻ ảnh */
   tap(ndcX: number, ndcY: number): boolean {
     this.pointer.set(ndcX, ndcY);
     this.raycaster.setFromCamera(this.pointer, this.camera);
-    const heroMesh = this.heroCard?.mesh.visible ? this.heroCard.mesh : null;
     const meshes = this.cards.map((c) => c.mesh).filter((m) => m.visible);
-    if (heroMesh) meshes.push(heroMesh);
     const hits = this.raycaster.intersectObjects(meshes, false);
     if (!hits.length) return false;
     const hit = hits[0].object as THREE.Mesh;
-    if (heroMesh && hit === heroMesh && this.heroCard) {
-      this.options.onOpenCard(this.heroCard.photo);
-      return true;
-    }
     const card = this.cards.find((c) => c.mesh === hit);
     if (!card) return false;
     this.options.onOpenCard(card.photo);
@@ -360,80 +422,49 @@ export class NeonScene {
     if (!this.group.visible) return;
 
     const reveal = this.revealState.value;
-    this.drag.x = damp(this.drag.x, this.drag.tx, 4.2, dt);
-    this.drag.y = damp(this.drag.y, this.drag.ty, 4.2, dt);
-    this.tilt.rotation.y = this.drag.x;
-    this.tilt.rotation.x = this.drag.y;
-    this.tilt.position.x = -this.drag.x * 2.2;
-    this.tilt.position.y = this.drag.y * 1.8;
+    this.drag.x = damp(this.drag.x, this.drag.tx, 6.2, dt);
+    this.drag.y = damp(this.drag.y, this.drag.ty, 6.2, dt);
+
+    // Camera bay quanh cụm không gian: ngang 360°, dọc gần trọn vòng.
+    this.orbitDistance = damp(this.orbitDistance, ORBIT_RADIUS, 3.2, dt);
+    const cp = Math.cos(this.drag.y);
+    this.camera.position.set(
+      ORBIT_CENTER.x - Math.sin(this.drag.x) * cp * this.orbitDistance,
+      ORBIT_CENTER.y + Math.sin(this.drag.y) * this.orbitDistance,
+      ORBIT_CENTER.z + Math.cos(this.drag.x) * cp * this.orbitDistance,
+    );
+    this.camera.lookAt(ORBIT_CENTER);
 
     const t = this.time;
-    const zNear = TUNNEL_NEAR;
-    const zFar = -TUNNEL_DEPTH;
 
     for (const s of this.textSprites) {
-      s.sprite.position.z += s.speed * dt;
-      if (s.sprite.position.z > 4.2) {
-        s.sprite.position.z = zFar;
-        const spread = this.spreadAt(zFar);
-        s.sprite.position.x = (Math.random() - 0.5) * spread.x * 0.96;
-        s.sprite.position.y = (Math.random() - 0.5) * spread.y * 0.9;
-      }
-      s.sprite.position.x += Math.sin(t * 0.18 + s.phase) * s.drift * dt;
-      s.sprite.position.y += Math.cos(t * 0.22 + s.phase) * 0.035 * dt;
-      const depthFade = clamp(1 - (CAMERA_Z - s.sprite.position.z - 26) / 34, 0.16, 1);
-      const passFade = clamp((4.2 - s.sprite.position.z) / 1.2, 0.15, 1);
-      (s.sprite.material as THREE.SpriteMaterial).opacity =
-        s.baseOpacity * depthFade * passFade * reveal;
+      orbitAroundY(s.sprite.position, s.speed * dt);
+      s.sprite.position.y = s.baseY + Math.sin(t * 0.24 + s.phase) * 0.24;
+      (s.sprite.material as THREE.SpriteMaterial).opacity = s.baseOpacity * reveal;
     }
 
     for (const c of this.cards) {
-      c.mesh.position.z += c.speed * dt;
-      if (c.mesh.position.z > 2.8) {
-        c.mesh.position.z = zFar;
-        const spread = this.spreadAt(zFar);
-        c.mesh.position.x = (Math.random() - 0.5) * spread.x * 0.9;
-        c.mesh.position.y = (Math.random() - 0.5) * spread.y * 0.82;
-        c.mesh.rotation.z = (Math.random() - 0.5) * 0.18;
-      }
-      // thẻ gần camera phóng to dần, tạo cảm giác bay sát qua
-      const dist = zNear - c.mesh.position.z;
-      const nearBoost = clamp(1 + (6 - dist) * 0.016, 1, 1.1);
-      c.mesh.scale.setScalar(nearBoost);
-      c.mesh.rotation.z = c.baseRot + Math.sin(t * 0.3 + c.phase) * 0.018;
-      const depthFade = clamp(1 - (CAMERA_Z - c.mesh.position.z - 24) / 40, 0.2, 1);
-      const passFade = clamp((2.8 - c.mesh.position.z) / 1.4, 0.12, 1);
-      (c.mesh.material as THREE.MeshBasicMaterial).opacity =
-        c.baseOpacity * depthFade * passFade * reveal;
-    }
-
-    // hero card: một thẻ lớn lướt sát camera mỗi ~9 giây
-    this.heroTimer -= dt;
-    if (this.heroTimer <= 0 && !this.reduced) {
-      this.heroTimer = 9 + Math.random() * 5;
-      this.spawnHeroCard();
-    }
-    if (this.heroCard) {
-      this.heroCard.mesh.position.z += dt * 4.2;
-      this.heroCard.mesh.position.x += dt * 0.45;
-      this.heroCard.mesh.rotation.z += dt * 0.03;
-      if (this.heroCard.mesh.position.z > CAMERA_Z + 2) {
-        this.heroCard.mesh.visible = false;
-        this.heroCard = null;
-      }
+      orbitAroundY(c.mesh.position, c.speed * dt);
+      c.mesh.position.y = c.baseY + Math.sin(t * 0.28 + c.phase) * 0.12;
+      c.mesh.lookAt(this.camera.position);
+      c.mesh.rotateX(c.tiltX);
+      c.mesh.rotateY(c.tiltY);
+      c.mesh.rotateZ(c.baseRot + Math.sin(t * 0.3 + c.phase) * 0.026);
+      (c.mesh.material as THREE.MeshBasicMaterial).opacity = c.baseOpacity * reveal;
     }
 
     const pos = this.hearts.geometry.getAttribute("position") as THREE.BufferAttribute;
     const arr = pos.array as Float32Array;
     for (let i = 0; i < this.heartSpeed.length; i++) {
-      arr[i * 3 + 1] =
-        this.heartBase[i * 3 + 1] + Math.sin(t * this.heartSpeed[i] * 0.6 + this.heartPhase[i]) * 0.7;
-      arr[i * 3] =
-        this.heartBase[i * 3] + Math.cos(t * this.heartSpeed[i] * 0.4 + this.heartPhase[i]) * 0.45;
-      arr[i * 3 + 2] =
-        ((this.heartBase[i * 3 + 2] + t * this.heartSpeed[i] * 0.55 + TUNNEL_DEPTH) % TUNNEL_DEPTH) -
-        TUNNEL_DEPTH +
-        zNear;
+      const angle = t * this.heartSpeed[i];
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const bx = this.heartBase[i * 3];
+      const by = this.heartBase[i * 3 + 1];
+      const bz = this.heartBase[i * 3 + 2];
+      arr[i * 3] = bx * cos + bz * sin;
+      arr[i * 3 + 1] = by + Math.sin(t * (0.35 + this.heartSpeed[i] * 3) + this.heartPhase[i]) * 0.5;
+      arr[i * 3 + 2] = -bx * sin + bz * cos;
     }
     pos.needsUpdate = true;
     (this.hearts.material as THREE.PointsMaterial).opacity =
@@ -450,29 +481,6 @@ export class NeonScene {
       this.captionIndex = idx;
       this.options.onCaption(idx);
     }
-
-    // thẻ ảnh mờ dần khi rất gần để không chặn chữ
-  }
-
-  private spawnHeroCard() {
-    if (!this.cards.length) return;
-    const source = this.cards[Math.floor(Math.random() * this.cards.length)];
-    const clone = source.mesh.clone();
-    clone.material = source.mesh.material;
-    clone.visible = true;
-    clone.scale.setScalar(1.9);
-    clone.position.set(-3.6, -2.1, -10);
-    clone.rotation.z = -0.06;
-    this.tilt.add(clone);
-    this.heroCard = {
-      mesh: clone,
-      baseZ: -10,
-      speed: 4.2,
-      phase: 0,
-      photo: source.photo,
-      baseRot: -0.06,
-      baseOpacity: 0.9,
-    };
   }
 
   get isStarted() {
@@ -495,8 +503,44 @@ export class NeonScene {
   }
 }
 
+function makeNebulaTexture() {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, "rgba(255,255,255,0.72)");
+  g.addColorStop(0.22, "rgba(255,120,200,0.34)");
+  g.addColorStop(0.52, "rgba(150,60,210,0.14)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/** Toạ độ trên mặt cầu quanh tâm; yaw = 0, pitch = 0 nằm phía sau tâm. */
+function pointOnSphere(radius: number, yaw: number, pitch: number) {
+  const cp = Math.cos(pitch);
+  return new THREE.Vector3(
+    Math.sin(yaw) * cp * radius,
+    Math.sin(pitch) * radius,
+    -Math.cos(yaw) * cp * radius,
+  );
+}
+
+function orbitAroundY(p: THREE.Vector3, angle: number) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const x = p.x * cos + p.z * sin;
+  const z = -p.x * sin + p.z * cos;
+  p.x = x;
+  p.z = z;
+}
+
 /** Canvas neon text, glow vẽ sẵn — không cần bloom post-processing. */
-function makeNeonTexture(text: string, scale: number): THREE.Texture {
+function makeNeonTexture(text: string): THREE.Texture {
   const pad = 46;
   const font = 104;
   const measureCanvas = document.createElement("canvas");
@@ -547,7 +591,6 @@ function makeNeonTexture(text: string, scale: number): THREE.Texture {
   tex.generateMipmaps = true;
   tex.anisotropy = 4;
   tex.userData.aspect = c.width / c.height;
-  tex.userData.scale = scale;
   return tex;
 }
 
